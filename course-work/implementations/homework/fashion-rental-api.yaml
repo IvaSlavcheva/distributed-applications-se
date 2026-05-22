@@ -1,0 +1,1079 @@
+openapi: 3.0.3
+info:
+  title: Fashion Rental System API
+  description: |
+    REST API за система за наемане на модни артикули.
+    Поддържа управление на потребители, модни артикули и наеми.
+
+    ## Автентикация
+    API използва **JWT Bearer токени** за автентикация.
+    Токенът се получава чрез `/api/Auth/login` и се подава в заглавката:
+    `Authorization: Bearer <token>`
+
+    ## Роли
+    - **User** – може да разглежда артикули и да управлява свои наеми
+    - **Admin** – пълен достъп, включително създаване/редактиране/изтриване на артикули
+
+    ## Специфики
+    - JWT токенът е валиден **2 часа** след издаването му
+    - При създаване на наем, общата цена се изчислява автоматично: `дни × цена_на_ден`
+    - При връщане на артикул (`PUT /api/Rentals/{id}/return`), той автоматично става наличен отново
+    - POST/PUT за FashionItems използват `multipart/form-data` поради качване на изображение
+  version: 1.0.0
+  contact:
+    name: FashionRentalSystem Support
+
+servers:
+  - url: https://localhost:7001/api
+    description: Development server (HTTPS)
+  - url: http://localhost:5001/api
+    description: Development server (HTTP)
+
+tags:
+  - name: Auth
+    description: Вход в системата
+  - name: Users
+    description: Управление на потребители
+  - name: FashionItems
+    description: Управление на модни артикули
+  - name: Rentals
+    description: Управление на наеми
+
+paths:
+
+  # ─────────────────────────────────────────────
+  # AUTH
+  # ─────────────────────────────────────────────
+
+  /Auth/login:
+    post:
+      tags:
+        - Auth
+      summary: Вход в системата
+      description: |
+        Автентикира потребител с имейл и парола (BCrypt верификация).
+        При успех връща JWT токен, валиден 2 часа.
+        Токенът съдържа claims: `NameIdentifier`, `Email`, `Role`.
+      operationId: Login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginDto'
+            example:
+              email: "ivan@example.com"
+              password: "Parola123"
+      responses:
+        '200':
+          description: Успешен вход — връща JWT токен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          description: Невалиден имейл или парола
+          content:
+            application/json:
+              schema:
+                type: string
+                example: "Invalid email or password."
+
+  # ─────────────────────────────────────────────
+  # USERS
+  # ─────────────────────────────────────────────
+
+  /Users:
+    get:
+      tags:
+        - Users
+      summary: Списък с всички потребители
+      description: |
+        Връща всички регистрирани потребители без чувствителни данни (без парола).
+      operationId: GetAllUsers
+      responses:
+        '200':
+          description: Списък с потребители
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GetUserDto'
+
+    post:
+      tags:
+        - Users
+      summary: Създаване на нов потребител (регистрация)
+      description: |
+        Създава нов потребителски акаунт. Паролата се хешира с BCrypt преди съхранение.
+        Полето `createdAt` се задава автоматично.
+      operationId: CreateUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUserDto'
+            example:
+              firstName: "Иван"
+              lastName: "Иванов"
+              email: "ivan@example.com"
+              password: "Parola123"
+              role: "User"
+              phoneNumber: "0888123456"
+      responses:
+        '200':
+          description: Потребителят е създаден успешно
+        '400':
+          description: Невалидни данни
+
+  /Users/{id}:
+    get:
+      tags:
+        - Users
+      summary: Детайли за конкретен потребител
+      description: Връща данни за потребител по ID.
+      operationId: GetUserById
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: Данни за потребителя
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetUserDto'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags:
+        - Users
+      summary: Обновяване на потребител
+      description: |
+        Обновява данните на съществуващ потребител.
+        Паролата не се обновява през този endpoint.
+      operationId: UpdateUser
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateUserDto'
+      responses:
+        '200':
+          description: Потребителят е обновен успешно
+        '400':
+          description: Невалидни данни
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags:
+        - Users
+      summary: Изтриване на потребител
+      description: Изтрива потребител по ID. Операцията е необратима.
+      operationId: DeleteUser
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: Потребителят е изтрит успешно
+        '400':
+          description: Грешка при изтриване
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ─────────────────────────────────────────────
+  # FASHION ITEMS
+  # ─────────────────────────────────────────────
+
+  /FashionItems:
+    get:
+      tags:
+        - FashionItems
+      summary: Списък с модни артикули (с филтриране и сортиране)
+      description: |
+        Връща всички модни артикули. Поддържа филтриране по дизайнер, категория и стил
+        (case-insensitive, частично съвпадение), както и сортиране.
+        **Достъпен без автентикация.**
+      operationId: GetAllFashionItems
+      parameters:
+        - name: designer
+          in: query
+          description: Филтър по дизайнер (частично, без значение на регистъра)
+          schema:
+            type: string
+            example: "Gucci"
+        - name: category
+          in: query
+          description: Филтър по категория (частично, без значение на регистъра)
+          schema:
+            type: string
+            example: "Dress"
+        - name: style
+          in: query
+          description: Филтър по стил (частично, без значение на регистъра)
+          schema:
+            type: string
+            example: "Casual"
+        - name: sortBy
+          in: query
+          description: Поле за сортиране
+          schema:
+            type: string
+            enum: [price, designer, date]
+            example: "price"
+        - name: page
+          in: query
+          description: Номер на страницата (в момента пагинацията е изключена в кода)
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: pageSize
+          in: query
+          description: Брой записи на страница
+          schema:
+            type: integer
+            minimum: 1
+            default: 10
+      responses:
+        '200':
+          description: Списък с модни артикули
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GetFashionItemDto'
+
+    post:
+      tags:
+        - FashionItems
+      summary: Добавяне на нов артикул (с качване на изображение)
+      description: |
+        Създава нов моден артикул. Поддържа качване на изображение като файл (`ImageFile`)
+        или подаване на URL (`ImageUrl`). Ако е подаден файл, той се записва в `wwwroot/images/`
+        с уникално GUID-базирано име и се генерира пълен URL.
+        **Изисква роля Admin.**
+      operationId: CreateFashionItem
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CreateFashionItemDto'
+      responses:
+        '200':
+          description: Артикулът е създаден успешно
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetFashionItemDto'
+        '400':
+          description: Грешка при създаване
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /FashionItems/{id}:
+    get:
+      tags:
+        - FashionItems
+      summary: Детайли за конкретен артикул
+      description: Връща пълна информация за моден артикул по ID.
+      operationId: GetFashionItemById
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: Данни за артикула
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetFashionItemDto'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags:
+        - FashionItems
+      summary: Обновяване на артикул (с качване на изображение)
+      description: |
+        Обновява данните на съществуващ моден артикул.
+        Ако е подаден нов `ImageFile`, старото изображение се заменя.
+        **Изисква роля Admin.**
+      operationId: UpdateFashionItem
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UpdateFashionItemDto'
+      responses:
+        '200':
+          description: Артикулът е обновен успешно
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetFashionItemDto'
+        '400':
+          description: Грешка при обновяване
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags:
+        - FashionItems
+      summary: Изтриване на артикул
+      description: |
+        Изтрива моден артикул по ID. Операцията е необратима.
+        **Изисква роля Admin.**
+      operationId: DeleteFashionItem
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: Артикулът е изтрит успешно
+        '400':
+          description: Грешка при изтриване
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ─────────────────────────────────────────────
+  # RENTALS
+  # ─────────────────────────────────────────────
+
+  /Rentals:
+    get:
+      tags:
+        - Rentals
+      summary: Списък с всички наеми
+      description: |
+        Връща всички наеми в системата.
+        **Изисква автентикация (User или Admin).**
+      operationId: GetAllRentals
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Списък с наеми
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GetRentalDto'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags:
+        - Rentals
+      summary: Създаване на нов наем
+      description: |
+        Регистрира нов наем на моден артикул. Системата извършва следните проверки:
+        - Артикулът трябва да съществува
+        - Артикулът трябва да е наличен (`IsAvailable = true`)
+        - `RentDate` не може да е в миналото
+        - `ReturnDate` трябва да е след `RentDate`
+        - Не трябва да има припокриване с друг активен наем за същия артикул
+
+        При успех: общата цена се изчислява автоматично `(дни + 1) × PricePerDay`
+        и артикулът се маркира като неналичен (`IsAvailable = false`).
+
+        **Изисква автентикация (User или Admin).**
+      operationId: CreateRental
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRentalDto'
+            example:
+              userId: 3
+              fashionItemId: 1
+              rentDate: "2026-06-01T00:00:00Z"
+              returnDate: "2026-06-07T00:00:00Z"
+      responses:
+        '200':
+          description: Артикулът е нает успешно
+          content:
+            application/json:
+              schema:
+                type: string
+                example: "Fashion item rented successfully."
+        '400':
+          description: Грешка при валидация
+          content:
+            application/json:
+              schema:
+                type: string
+              examples:
+                notAvailable:
+                  value: "Fashion item is already rented."
+                dateConflict:
+                  value: "Return date must be after rent date."
+                pastDate:
+                  value: "Rent date cannot be in the past."
+                overlapConflict:
+                  value: "Fashion item is already rented for the selected period."
+                invalidPeriod:
+                  value: "Invalid rental period."
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Артикулът не е намерен
+          content:
+            application/json:
+              schema:
+                type: string
+                example: "Fashion item not found."
+
+  /Rentals/{id}:
+    get:
+      tags:
+        - Rentals
+      summary: Детайли за конкретен наем
+      description: |
+        Връща пълна информация за наем по ID.
+        **Изисква автентикация.**
+      operationId: GetRentalById
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: Данни за наема
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetRentalDto'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags:
+        - Rentals
+      summary: Обновяване на наем
+      description: |
+        Обновява данните на съществуващ наем (напр. промяна на статус, дати, цена).
+        **Изисква автентикация.**
+      operationId: UpdateRental
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateRentalDto'
+      responses:
+        '200':
+          description: Наемът е обновен успешно
+          content:
+            application/json:
+              schema:
+                type: string
+                example: "Rental updated successfully."
+        '400':
+          description: Грешка при обновяване
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags:
+        - Rentals
+      summary: Изтриване на наем
+      description: |
+        Изтрива запис за наем по ID. Операцията е необратима.
+        **Изисква автентикация.**
+      operationId: DeleteRental
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: Наемът е изтрит успешно
+        '400':
+          description: Грешка при изтриване
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /Rentals/{id}/return:
+    put:
+      tags:
+        - Rentals
+      summary: Връщане на нает артикул
+      description: |
+        Маркира наема като върнат (`Status = "Returned"`) и автоматично
+        връща артикула в наличност (`IsAvailable = true`).
+        **Изисква автентикация.**
+      operationId: ReturnRental
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: Артикулът е върнат успешно
+          content:
+            application/json:
+              schema:
+                type: string
+                example: "Fashion item returned successfully."
+        '400':
+          description: Грешка при обновяване
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /Rentals/user/{userId}:
+    get:
+      tags:
+        - Rentals
+      summary: Наеми на конкретен потребител
+      description: |
+        Връща всички наеми на даден потребител, обогатени с данни за артикула
+        (наименование и URL на изображение).
+        **Изисква автентикация.**
+      operationId: GetUserRentals
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          description: ID на потребителя
+          schema:
+            type: integer
+            minimum: 1
+            example: 3
+      responses:
+        '200':
+          description: Наеми на потребителя
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/UserRentalDto'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+# ─────────────────────────────────────────────
+# COMPONENTS
+# ─────────────────────────────────────────────
+
+components:
+
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT токен получен от `/api/Auth/login` (валиден 2 часа)
+
+  parameters:
+    IdParam:
+      name: id
+      in: path
+      required: true
+      description: Уникален идентификатор на ресурса
+      schema:
+        type: integer
+        minimum: 1
+
+  responses:
+    Unauthorized:
+      description: Липсва или е невалиден JWT токен
+      content:
+        application/json:
+          schema:
+            type: string
+            example: "Unauthorized"
+    Forbidden:
+      description: Потребителят няма необходимата роля (изисква Admin)
+      content:
+        application/json:
+          schema:
+            type: string
+            example: "Forbidden"
+    NotFound:
+      description: Ресурсът не е намерен
+      content:
+        application/json:
+          schema:
+            type: string
+            example: "Not Found"
+
+  schemas:
+
+    # ── Auth ──────────────────────────────────
+
+    LoginDto:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          description: Имейл адрес (валидира се с [EmailAddress])
+          example: "ivan@example.com"
+        password:
+          type: string
+          description: Парола на потребителя
+          example: "Parola123"
+
+    LoginResponse:
+      type: object
+      properties:
+        token:
+          type: string
+          description: JWT Bearer токен (валиден 2 часа)
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+
+    # ── Users ─────────────────────────────────
+
+    GetUserDto:
+      type: object
+      description: Данни за потребител (без парола)
+      properties:
+        id:
+          type: integer
+          example: 1
+        firstName:
+          type: string
+          maxLength: 50
+          example: "Иван"
+        lastName:
+          type: string
+          maxLength: 50
+          example: "Иванов"
+        email:
+          type: string
+          format: email
+          maxLength: 100
+          example: "ivan@example.com"
+        role:
+          type: string
+          enum: [User, Admin]
+          maxLength: 20
+          example: "User"
+        phoneNumber:
+          type: string
+          maxLength: 20
+          nullable: true
+          example: "0888123456"
+        createdAt:
+          type: string
+          format: date-time
+          description: Дата и час на създаване (UTC)
+          example: "2026-05-19T10:00:00Z"
+
+    CreateUserDto:
+      type: object
+      required:
+        - firstName
+        - lastName
+        - email
+        - password
+        - role
+      properties:
+        firstName:
+          type: string
+          maxLength: 50
+          example: "Иван"
+        lastName:
+          type: string
+          maxLength: 50
+          example: "Иванов"
+        email:
+          type: string
+          format: email
+          maxLength: 100
+          description: Валидира се с [EmailAddress]
+          example: "ivan@example.com"
+        password:
+          type: string
+          maxLength: 100
+          description: Парола в plaintext; хешира се с BCrypt преди съхранение
+          example: "Parola123"
+        role:
+          type: string
+          enum: [User, Admin]
+          maxLength: 20
+          default: "User"
+          example: "User"
+        phoneNumber:
+          type: string
+          maxLength: 20
+          nullable: true
+          example: "0888123456"
+
+    UpdateUserDto:
+      type: object
+      required:
+        - firstName
+        - lastName
+        - email
+        - role
+      properties:
+        firstName:
+          type: string
+          maxLength: 50
+          example: "Иван"
+        lastName:
+          type: string
+          maxLength: 50
+          example: "Иванов"
+        email:
+          type: string
+          format: email
+          maxLength: 100
+          description: Валидира се с [EmailAddress]
+          example: "ivan@example.com"
+        phoneNumber:
+          type: string
+          maxLength: 20
+          nullable: true
+          example: "0888123456"
+        role:
+          type: string
+          enum: [User, Admin]
+          maxLength: 20
+          example: "Admin"
+
+    # ── FashionItems ──────────────────────────
+
+    GetFashionItemDto:
+      type: object
+      description: Пълни данни за моден артикул
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          maxLength: 100
+          example: "Вечерна рокля Gucci"
+        designer:
+          type: string
+          maxLength: 100
+          example: "Gucci"
+        category:
+          type: string
+          maxLength: 50
+          example: "Dress"
+        style:
+          type: string
+          maxLength: 50
+          example: "Evening"
+        size:
+          type: string
+          maxLength: 20
+          example: "M"
+        pricePerDay:
+          type: number
+          format: decimal
+          description: Цена за наем на ден (в лева)
+          example: 45.00
+        isAvailable:
+          type: boolean
+          description: Дали артикулът е наличен за наемане
+          example: true
+        imageUrl:
+          type: string
+          nullable: true
+          description: URL на изображението (генерира се автоматично при качване на файл)
+          example: "https://localhost:7001/images/abc123.jpg"
+        createdAt:
+          type: string
+          format: date-time
+          example: "2026-05-19T10:00:00Z"
+
+    CreateFashionItemDto:
+      type: object
+      required:
+        - name
+        - designer
+        - category
+        - style
+        - size
+        - pricePerDay
+        - isAvailable
+      properties:
+        name:
+          type: string
+          maxLength: 100
+          example: "Вечерна рокля Gucci"
+        designer:
+          type: string
+          maxLength: 100
+          example: "Gucci"
+        category:
+          type: string
+          maxLength: 50
+          example: "Dress"
+        style:
+          type: string
+          maxLength: 50
+          example: "Evening"
+        size:
+          type: string
+          maxLength: 20
+          example: "M"
+        pricePerDay:
+          type: number
+          format: decimal
+          example: 45.00
+        isAvailable:
+          type: boolean
+          default: true
+          example: true
+        imageUrl:
+          type: string
+          nullable: true
+          description: URL на съществуващо изображение (алтернатива на ImageFile)
+          example: "https://example.com/images/dress.jpg"
+        imageFile:
+          type: string
+          format: binary
+          nullable: true
+          description: |
+            Файл с изображение за качване. При подаване се записва в `wwwroot/images/`
+            с уникално GUID-базирано ime и се генерира пълен URL автоматично.
+
+    UpdateFashionItemDto:
+      type: object
+      required:
+        - name
+        - designer
+        - category
+        - style
+        - size
+        - pricePerDay
+        - isAvailable
+      properties:
+        name:
+          type: string
+          maxLength: 100
+          example: "Вечерна рокля Gucci Pro"
+        designer:
+          type: string
+          maxLength: 100
+          example: "Gucci"
+        category:
+          type: string
+          maxLength: 50
+          example: "Dress"
+        style:
+          type: string
+          maxLength: 50
+          example: "Formal"
+        size:
+          type: string
+          maxLength: 20
+          example: "L"
+        pricePerDay:
+          type: number
+          format: decimal
+          example: 50.00
+        isAvailable:
+          type: boolean
+          example: true
+        imageUrl:
+          type: string
+          nullable: true
+          description: Текущ URL на изображението (запазва се ако не е подаден нов файл)
+          example: "https://localhost:7001/images/abc123.jpg"
+        imageFile:
+          type: string
+          format: binary
+          nullable: true
+          description: Нов файл за замяна на съществуващото изображение
+
+    # ── Rentals ───────────────────────────────
+
+    GetRentalDto:
+      type: object
+      description: Пълни данни за наем
+      properties:
+        id:
+          type: integer
+          example: 1
+        userId:
+          type: integer
+          description: ID на потребителя, направил наема
+          example: 3
+        fashionItemId:
+          type: integer
+          description: ID на наетия артикул
+          example: 1
+        rentDate:
+          type: string
+          format: date-time
+          description: Начална дата на наема
+          example: "2026-06-01T00:00:00Z"
+        returnDate:
+          type: string
+          format: date-time
+          description: Крайна дата на наема
+          example: "2026-06-07T00:00:00Z"
+        totalPrice:
+          type: number
+          format: decimal
+          description: Обща цена (изчислена автоматично при създаване)
+          example: 315.00
+        status:
+          type: string
+          enum: [Active, Returned]
+          maxLength: 20
+          description: Текущ статус на наема
+          example: "Active"
+        createdAt:
+          type: string
+          format: date-time
+          example: "2026-05-31T20:00:00Z"
+
+    CreateRentalDto:
+      type: object
+      required:
+        - userId
+        - fashionItemId
+        - rentDate
+        - returnDate
+      description: |
+        Данни за нов наем. Системата проверява:
+        - наличност на артикула
+        - валидност на датите (не в миналото, returnDate > rentDate)
+        - липса на припокриване с друг активен наем
+        Общата цена се изчислява автоматично.
+      properties:
+        userId:
+          type: integer
+          description: ID на потребителя (трябва да съществува)
+          example: 3
+        fashionItemId:
+          type: integer
+          description: ID на артикула за наемане (трябва да е наличен)
+          example: 1
+        rentDate:
+          type: string
+          format: date-time
+          description: Начална дата (не може да е в миналото)
+          example: "2026-06-01T00:00:00Z"
+        returnDate:
+          type: string
+          format: date-time
+          description: Крайна дата (трябва да е след rentDate)
+          example: "2026-06-07T00:00:00Z"
+
+    UpdateRentalDto:
+      type: object
+      required:
+        - userId
+        - fashionItemId
+        - rentDate
+        - returnDate
+        - totalPrice
+        - status
+      properties:
+        userId:
+          type: integer
+          example: 3
+        fashionItemId:
+          type: integer
+          example: 1
+        rentDate:
+          type: string
+          format: date-time
+          example: "2026-06-01T00:00:00Z"
+        returnDate:
+          type: string
+          format: date-time
+          example: "2026-06-07T00:00:00Z"
+        totalPrice:
+          type: number
+          format: decimal
+          minimum: 0.01
+          maximum: 100000
+          description: Обща цена (валидира се с [Range(0.01, 100000)])
+          example: 315.00
+        status:
+          type: string
+          enum: [Active, Returned]
+          maxLength: 20
+          example: "Returned"
+
+    UserRentalDto:
+      type: object
+      description: Наем с денормализирани данни за артикула (за изглед на потребителя)
+      properties:
+        id:
+          type: integer
+          example: 1
+        fashionItemId:
+          type: integer
+          example: 1
+        fashionItemName:
+          type: string
+          description: Наименование на артикула (денормализиран)
+          example: "Вечерна рокля Gucci"
+        imageUrl:
+          type: string
+          nullable: true
+          description: URL на изображението на артикула (денормализиран)
+          example: "https://localhost:7001/images/abc123.jpg"
+        rentDate:
+          type: string
+          format: date-time
+          example: "2026-06-01T00:00:00Z"
+        returnDate:
+          type: string
+          format: date-time
+          example: "2026-06-07T00:00:00Z"
+        totalPrice:
+          type: number
+          format: decimal
+          example: 315.00
+        status:
+          type: string
+          enum: [Active, Returned]
+          example: "Active"
