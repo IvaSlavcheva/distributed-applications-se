@@ -1,0 +1,6 @@
+@FashionSystem_HostAddress = http://localhost:5031
+
+GET {{FashionSystem_HostAddress}}/api/fashionitems
+Accept: application/json
+
+###

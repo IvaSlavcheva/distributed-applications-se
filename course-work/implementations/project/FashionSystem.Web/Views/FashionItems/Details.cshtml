@@ -1,0 +1,122 @@
+﻿@model FashionSystem.Web.Models.FashionItem.GetFashionItemDto
+
+<div class="container mt-4">
+
+    <div class="card shadow">
+
+        <div class="row g-0">
+
+            <div class="col-md-5">
+
+                <img src="@Model.ImageUrl"
+                     class="img-fluid rounded-start"
+                     style="height:100%;
+                            object-fit:cover;" />
+
+            </div>
+
+            <div class="col-md-7">
+
+                <div class="card-body">
+
+                    <h2>
+                        @Model.Name
+                    </h2>
+
+                    <hr />
+
+                    <p>
+                        <strong>Designer:</strong>
+                        @Model.Designer
+                    </p>
+
+                    <p>
+                        <strong>Category:</strong>
+                        @Model.Category
+                    </p>
+
+                    <p>
+                        <strong>Style:</strong>
+                        @Model.Style
+                    </p>
+
+                    <p>
+                        <strong>Size:</strong>
+                        @Model.Size
+                    </p>
+
+                    <p>
+                        <strong>Price:</strong>
+                        $@Model.PricePerDay/day
+                    </p>
+
+                    <p>
+                        <strong>Created:</strong>
+                        @Model.CreatedAt.ToShortDateString()
+                    </p>
+
+                    @if (Model.IsAvailable)
+                    {
+                        <span class="badge bg-success">
+                            Available
+                        </span>
+                    }
+                    else
+                    {
+                        <span class="badge bg-danger">
+                            Rented
+                        </span>
+                    }
+
+                    <div class="mt-4">
+
+                        @if (Context.Session.GetString("Role") == "Admin")
+                        {
+                            <a asp-action="Edit"
+                               asp-route-id="@Model.Id"
+                               class="btn btn-dark">
+                                Edit
+                            </a>
+
+                            <a asp-action="Delete"
+                               asp-route-id="@Model.Id"
+                               class="btn btn-danger">
+                                Delete
+                            </a>
+                        }
+
+                        else if (
+                        Context.Session.GetString("JWT") != null
+                        &&
+                        Context.Session.GetString("Role") != "Admin"
+                        &&
+                        Model.IsAvailable)
+                        {
+                            <form asp-action="Rent"
+                                  asp-route-id="@Model.Id"
+                                  method="post"
+                                  class="d-inline">
+
+                                <button class="btn btn-success">
+                                    Rent
+                                </button>
+
+                            </form>
+                        }
+
+                        <a asp-action="Index"
+                           class="btn btn-secondary">
+                            Back
+                        </a>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>

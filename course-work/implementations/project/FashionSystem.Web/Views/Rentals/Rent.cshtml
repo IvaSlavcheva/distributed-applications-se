@@ -1,0 +1,71 @@
+﻿@model FashionSystem.Web.Models.Rental.CreateRentalDto
+
+<h2 class="mb-4">
+    Rent Fashion Item
+</h2>
+
+<div class="row">
+    <div class="col-md-6">
+
+        <form asp-action="Rent"
+              method="post">
+
+            <input type="hidden"
+                   asp-for="FashionItemId" />
+
+            <div class="mb-3">
+
+                <label asp-for="RentDate"
+                       class="form-label">
+                    Rent Date
+                </label>
+
+                <input asp-for="RentDate"
+                       type="date"
+                       class="form-control"
+                       min="@DateTime.Now.ToString("yyyy-MM-dd")" />
+
+                <span asp-validation-for="RentDate"
+                      class="text-danger">
+                </span>
+
+            </div>
+
+            <div class="mb-3">
+
+                <label asp-for="ReturnDate"
+                       class="form-label">
+                    Return Date
+                </label>
+
+                <input asp-for="ReturnDate"
+                       type="date"
+                       class="form-control"
+                       min="@DateTime.Now.ToString("yyyy-MM-dd")" />
+
+                <span asp-validation-for="ReturnDate"
+                      class="text-danger">
+                </span>
+
+            </div>
+
+            <button type="submit"
+                    class="btn btn-dark w-100">
+
+                Rent Now
+
+            </button>
+
+        </form>
+
+        <div asp-validation-summary="All"
+             class="text-danger mt-3">
+        </div>
+
+    </div>
+</div>
+
+@section Scripts
+{
+    <partial name="_ValidationScriptsPartial" />
+}

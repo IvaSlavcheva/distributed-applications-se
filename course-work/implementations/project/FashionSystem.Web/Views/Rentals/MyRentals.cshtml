@@ -1,0 +1,214 @@
+﻿@model IEnumerable<FashionSystem.Web.Models.Rental.GetRentalDto>
+
+<link rel="preconnect"
+      href="https://fonts.googleapis.com">
+
+<link rel="preconnect"
+      href="https://fonts.gstatic.com"
+      crossorigin>
+
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Poppins:wght@300;400;500;600&display=swap"
+      rel="stylesheet">
+
+<style>
+
+    body {
+        background: #F8F4EE;
+        font-family: 'Poppins', sans-serif;
+    }
+
+    .rentals-title {
+        font-family: 'Playfair Display', serif;
+        font-size: 3.2rem;
+        margin-bottom: 40px;
+        color: #2B2B2B;
+    }
+
+    .rental-card {
+        max-width: 320px;
+        margin: auto;
+        border-radius: 26px;
+        overflow: hidden;
+        border: none;
+        background: white;
+        box-shadow: 0 18px 45px rgba(0,0,0,0.08);
+        transition: 0.35s ease;
+    }
+
+        .rental-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 28px 55px rgba(0,0,0,0.13);
+        }
+
+    .rental-image {
+        height: 230px;
+        object-fit: cover;
+        width: 100%;
+        transition: 0.5s ease;
+    }
+
+    .rental-card:hover .rental-image {
+        transform: scale(1.05);
+    }
+
+    .rental-body {
+        padding: 22px;
+    }
+
+    .rental-name {
+        font-family: 'Playfair Display', serif;
+        font-size: 1.6rem;
+        margin-bottom: 18px;
+        color: #2B2B2B;
+    }
+
+    .rental-info {
+        color: #5f5a54;
+        margin-bottom: 12px;
+        font-size: 0.95rem;
+    }
+
+    .rental-price {
+        font-size: 1.2rem;
+        font-weight: 600;
+        margin-top: 18px;
+        margin-bottom: 18px;
+        color: #2B2B2B;
+    }
+
+    .status-badge {
+        display: inline-block;
+        padding: 8px 16px;
+        border-radius: 50px;
+        font-size: 0.85rem;
+        font-weight: 500;
+        margin-bottom: 18px;
+    }
+
+    .active-status {
+        background: #fff0d6;
+        color: #a06d00;
+    }
+
+    .returned-status {
+        background: #d8f3dc;
+        color: #2d6a4f;
+    }
+
+    .return-btn {
+        width: 100%;
+        border-radius: 50px;
+        padding: 12px;
+        border: none;
+        background: #2B2B2B;
+        color: white;
+        transition: 0.3s ease;
+        font-weight: 500;
+    }
+
+        .return-btn:hover {
+            background: #C6A969;
+        }
+
+    .empty-box {
+        background: white;
+        padding: 50px;
+        border-radius: 24px;
+        text-align: center;
+        box-shadow: 0 18px 45px rgba(0,0,0,0.08);
+    }
+
+</style>
+
+<div class="container py-5">
+
+    <h1 class="rentals-title">
+        My Rentals
+    </h1>
+
+    @if (!Model.Any())
+    {
+        <div class="empty-box">
+
+            <h4>
+                No rentals yet
+            </h4>
+
+            <p class="text-muted mb-0">
+                Your rented fashion items will appear here.
+            </p>
+
+        </div>
+    }
+    else
+    {
+        <div class="row g-4">
+
+            @foreach (var rental in Model)
+            {
+                <div class="col-xl-3 col-lg-4 col-md-6">
+
+                    <div class="card rental-card">
+
+                        <div style="overflow:hidden;">
+
+                            <img src="@rental.ImageUrl"
+                                 class="rental-image"
+                                 alt="@rental.FashionItemName" />
+
+                        </div>
+
+                        <div class="rental-body">
+
+                            <h4 class="rental-name">
+                                @rental.FashionItemName
+                            </h4>
+
+                            <p class="rental-info">
+                                <strong>Rent Date:</strong>
+                                @rental.RentDate.ToString("dd/MM/yyyy")
+                            </p>
+
+                            <p class="rental-info">
+                                <strong>Return Date:</strong>
+                                @rental.ReturnDate.ToString("dd/MM/yyyy")
+                            </p>
+
+                            <div class="rental-price">
+                                $@rental.TotalPrice.ToString("F2")
+                            </div>
+
+                            @if (rental.Status != "Returned")
+                            {
+                                <span class="status-badge active-status">
+                                    Active Rental
+                                </span>
+
+                                <form asp-action="ReturnRental"
+                                      asp-route-id="@rental.Id"
+                                      method="post">
+
+                                    <button class="return-btn">
+                                        Return Item
+                                    </button>
+
+                                </form>
+                            }
+                            else
+                            {
+                                <span class="status-badge returned-status">
+                                    Returned
+                                </span>
+                            }
+
+                        </div>
+
+                    </div>
+
+                </div>
+            }
+
+        </div>
+    }
+
+</div>

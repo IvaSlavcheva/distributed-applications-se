@@ -1,0 +1,320 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="utf-8" />
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0" />
+
+    <title>
+        @ViewData["Title"] - FashionSystem
+    </title>
+
+    <link rel="preconnect"
+          href="https://fonts.googleapis.com">
+
+    <link rel="preconnect"
+          href="https://fonts.gstatic.com"
+          crossorigin>
+
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Poppins:wght@300;400;500;600&display=swap"
+          rel="stylesheet">
+
+    <link rel="stylesheet"
+          href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+
+    <link rel="stylesheet"
+          href="~/css/site.css"
+          asp-append-version="true" />
+
+    <style>
+
+        body {
+            background: #F8F4EE;
+            font-family: 'Poppins', sans-serif;
+            color: #2B2B2B;
+            overflow-x: hidden;
+        }
+
+        .luxury-navbar {
+            background: rgba(22,22,22,0.78);
+            backdrop-filter: blur(18px);
+            -webkit-backdrop-filter: blur(18px);
+            padding: 18px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+            position: sticky;
+            top: 0;
+            z-index: 9999;
+        }
+
+        .navbar-brand {
+            font-family: 'Playfair Display', serif;
+            font-size: 2rem;
+            font-weight: 700;
+            color: white !important;
+            letter-spacing: 1px;
+            transition: 0.3s ease;
+        }
+
+            .navbar-brand:hover {
+                color: #C6A969 !important;
+            }
+
+        .navbar-nav {
+            align-items: center;
+            gap: 12px;
+        }
+
+        .nav-link {
+            color: rgba(255,255,255,0.82) !important;
+            font-size: 1rem;
+            font-weight: 400;
+            position: relative;
+            transition: 0.3s ease;
+        }
+
+            .nav-link:hover {
+                color: #C6A969 !important;
+            }
+
+            .nav-link::after {
+                content: '';
+                position: absolute;
+                left: 0;
+                bottom: -5px;
+                width: 0%;
+                height: 1.5px;
+                background: #C6A969;
+                transition: 0.3s ease;
+            }
+
+            .nav-link:hover::after {
+                width: 100%;
+            }
+
+        .luxury-btn {
+            border-radius: 50px;
+            padding: 10px 24px !important;
+            transition: 0.3s ease;
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .register-btn {
+            background: #C6A969;
+            color: white !important;
+            border: none;
+        }
+
+            .register-btn:hover {
+                background: #b59656;
+                color: white !important;
+                transform: translateY(-2px);
+            }
+
+        .logout-btn {
+            border: 1px solid rgba(255,255,255,0.2);
+            color: white !important;
+            background: rgba(255,255,255,0.05);
+        }
+
+            .logout-btn:hover {
+                background: rgba(255,255,255,0.12);
+                color: #C6A969 !important;
+            }
+
+        main {
+            min-height: 85vh;
+        }
+
+        .luxury-footer {
+            background: #181818;
+            padding: 30px 0;
+            margin-top: 100px;
+            border-top: 1px solid rgba(255,255,255,0.08);
+        }
+
+        .footer-text {
+            color: rgba(255,255,255,0.6);
+            margin: 0;
+            text-align: center;
+            font-size: 0.95rem;
+        }
+
+        .footer-link {
+            color: #C6A969;
+            text-decoration: none;
+        }
+
+            .footer-link:hover {
+                color: white;
+            }
+
+        @@media (max-width: 991px) {
+
+            .navbar-nav {
+                margin-top: 20px;
+                gap: 8px;
+            }
+
+            .nav-link::after {
+                display: none;
+            }
+        }
+
+    </style>
+
+</head>
+
+<body>
+
+    <header>
+
+        <nav class="navbar navbar-expand-lg luxury-navbar navbar-dark">
+
+            <div class="container">
+
+                <a class="navbar-brand"
+                   asp-controller="Home"
+                   asp-action="Index">
+
+                    FashionSystem
+
+                </a>
+
+                <button class="navbar-toggler"
+                        type="button"
+                        data-bs-toggle="collapse"
+                        data-bs-target="#navbarNav">
+
+                    <span class="navbar-toggler-icon"></span>
+
+                </button>
+
+                <div class="collapse navbar-collapse"
+                     id="navbarNav">
+
+                    <ul class="navbar-nav me-auto">
+
+                        @if (Context.Session.GetString("Role") != "Admin"
+                                                && Context.Session.GetString("JWT") != null)
+                        {
+                            <li class="nav-item">
+
+                                <a class="nav-link"
+                                   asp-controller="Rentals"
+                                   asp-action="MyRentals">
+
+                                    My Rentals
+
+                                </a>
+
+                            </li>
+                        }
+
+                        <li class="nav-item">
+
+                            <a class="nav-link"
+                               asp-controller="FashionItems"
+                               asp-action="Index">
+
+                                Fashion Items
+
+                            </a>
+
+                        </li>
+
+                    </ul>
+
+                    <ul class="navbar-nav align-items-center">
+
+                        @if (Context.Session.GetString("JWT") == null)
+                        {
+                            <li class="nav-item me-2">
+
+                                <a class="nav-link"
+                                   asp-controller="Auth"
+                                   asp-action="Login">
+
+                                    Login
+
+                                </a>
+
+                            </li>
+
+                            <li class="nav-item">
+
+                                <a class="luxury-btn register-btn"
+                                   asp-controller="Auth"
+                                   asp-action="Register">
+
+                                    Register
+
+                                </a>
+
+                            </li>
+                        }
+                        else
+                        {
+                            <li class="nav-item">
+
+                                <a class="luxury-btn logout-btn"
+                                   asp-controller="Auth"
+                                   asp-action="Logout">
+
+                                    Logout
+
+                                </a>
+
+                            </li>
+                        }
+
+                    </ul>
+
+                </div>
+
+            </div>
+
+        </nav>
+
+    </header>
+
+    <div class="container">
+
+        <main role="main" class="pb-3">
+
+            @RenderBody()
+
+        </main>
+
+    </div>
+
+    <footer class="luxury-footer">
+
+        <div class="container">
+
+            <p class="footer-text">
+
+                © 2026 FashionSystem —
+                Luxury Fashion Rental Experience
+
+            </p>
+
+        </div>
+
+    </footer>
+
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script src="~/js/site.js"
+            asp-append-version="true"></script>
+
+    @await RenderSectionAsync("Scripts", required: false)
+
+</body>
+
+</html>

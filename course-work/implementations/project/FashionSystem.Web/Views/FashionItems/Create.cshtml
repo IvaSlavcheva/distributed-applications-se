@@ -1,0 +1,116 @@
+﻿@model FashionSystem.Web.Models.FashionItem.CreateFashionItemDto
+
+<div class="container mt-4">
+
+    <h2 class="mb-4">
+        Create Fashion Item
+    </h2>
+
+    <form asp-action="Create"
+          enctype="multipart/form-data">
+
+        <div asp-validation-summary="All"
+             class="text-danger">
+        </div>
+
+        <div class="mb-3">
+
+            <label class="form-label">
+                Name
+            </label>
+
+            <input asp-for="Name"
+                   class="form-control" />
+
+        </div>
+
+        <div class="mb-3">
+
+            <label class="form-label">
+                Designer
+            </label>
+
+            <input asp-for="Designer"
+                   class="form-control" />
+
+        </div>
+
+        <div class="mb-3">
+
+            <label class="form-label">
+                Category
+            </label>
+
+            <input asp-for="Category"
+                   class="form-control" />
+
+        </div>
+
+        <div class="mb-3">
+
+            <label class="form-label">
+                Style
+            </label>
+
+            <input asp-for="Style"
+                   class="form-control" />
+
+        </div>
+
+        <div class="mb-3">
+
+            <label class="form-label">
+                Size
+            </label>
+
+            <input asp-for="Size"
+                   class="form-control" />
+
+        </div>
+
+        <div class="mb-3">
+
+            <label class="form-label">
+                Price Per Day
+            </label>
+
+            <input asp-for="PricePerDay"
+                   class="form-control" />
+
+        </div>
+
+        <div class="mb-3">
+
+            <label class="form-label">
+                Upload Image
+            </label>
+
+            <input asp-for="ImageFile"
+                   type="file"
+                   class="form-control" />
+
+        </div>
+
+        <div class="form-check mb-4">
+
+            <input asp-for="IsAvailable"
+                   class="form-check-input" />
+
+            <label class="form-check-label">
+                Available
+            </label>
+
+        </div>
+
+        <button class="btn btn-dark">
+            Create
+        </button>
+
+        <a asp-action="Index"
+           class="btn btn-secondary">
+            Back
+        </a>
+
+    </form>
+
+</div>
